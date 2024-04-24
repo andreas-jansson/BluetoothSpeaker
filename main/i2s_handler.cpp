@@ -26,13 +26,13 @@ return instance;
 
 void I2sHandler::i2s_driver_install(void)
 {
-    puts(__func__);
+    printf("%s %d core %d:\n",__func__, __LINE__,xPortGetCoreID());
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
     chan_cfg.auto_clear = true;
     
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(44100),
-        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
         .gpio_cfg = {
             .mclk = I2S_GPIO_UNUSED,
             .bclk = static_cast<gpio_num_t>(m_pin_bck),
@@ -98,7 +98,6 @@ bool I2sHandler::i2s_task_start_up(void)
         printf("%s, ringbuffer create failed\n", __func__);
         return false;
     }
-
 
     xTaskCreate(i2s_task_handler, "BtI2STask", 4048, nullptr, configMAX_PRIORITIES - 3, &s_bt_i2s_task_handle);
     return true;

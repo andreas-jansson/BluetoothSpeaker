@@ -44,7 +44,10 @@ class BluetoothHandler{
     static bool m_volume_notify;                 /* notify volume change or not */
     static uint8_t c_volumeMax;                 
     static uint8_t c_volumeStepSize;
-    static uint8_t m_connectedMacAddr[6];           
+    static uint8_t m_connectedMacAddr[6];    
+    static bool s_isConnected;       
+    static TaskHandle_t s_reconnect_handle;
+
 
 
     BluetoothHandler();
@@ -53,8 +56,9 @@ class BluetoothHandler{
     bool init_flash();
     bool init_callbacks();
 
-
-
+    static void save_mac_to_nvs(uint8_t* a_addr);
+    static void reconnect_last_device(void* arg);
+    static void forget_last_device();
     static void bt_av_new_track(void);
     static void bt_av_playback_changed(void);
     static void bt_av_play_pos_changed(void);

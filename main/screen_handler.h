@@ -56,10 +56,12 @@ class ScreenHandler
     static SemaphoreHandle_t m_volume_lock;
 
     std::uint32_t m_batteryLevel{};
+    bool m_batteryEmpty;
 
     ScreenHandler();
     void buffer_image();
     void draw_battery(TFT_eSprite& a_sprite);
+    void draw_bluetooth_status(TFT_eSprite& a_sprite);
     static void t_display_handler(void *arg);
 
 public:
@@ -73,7 +75,7 @@ public:
     void update_track_elapsed_time();
     void update_play_status(playStatus isPlaying);
     void set_connected_status(connectedStatusEnum a_status){connectedStatus = a_status;}
-    void set_battery_level(std::uint32_t a_level);
+    void set_battery_level(std::uint32_t a_level, bool a_danger);
 
     ScreenHandler(const ScreenHandler &obj) = delete;
 };

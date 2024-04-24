@@ -1,5 +1,7 @@
 #include "screen_handler.h"
 
+#include <chrono>
+
 #include "images/play_btn.h"
 #include "images/stop_btn.h"
 #include "images/muted_btn.h"
@@ -37,7 +39,7 @@ ScreenHandler *ScreenHandler::getInstance()
 bool ScreenHandler::init()
 {
     m_tft.init();
-    m_tft.setRotation(3);
+    m_tft.setRotation(1);
 
     s_backgroundSprite.createSprite(240, 135);
     s_backgroundSprite.setSwapBytes(true);
@@ -72,15 +74,22 @@ bool ScreenHandler::init()
 
 void ScreenHandler::buffer_image()
 {
+
+    if(m_batteryEmpty){
+        //TFT_eSPI planeBkground = TFT_eSPI();
+        s_backgroundSprite.fillRect(0, 0, 240, 135, TFT_BLACK);
+        const char msg[] = "LOW BATTERY\n     SHUT OFF!";
+        s_backgroundSprite.drawString(msg, 30, 40);
+        s_backgroundSprite.pushSprite(0, 0);
+        return;
+    }
+
     
     s_backgroundSprite.pushImage(0 ,0 , 240, 135, wallPaper);
-
     s_volumeTxtSprite.fillSprite(TFT_BLACK);
     s_backgroundSprite.drawString(m_artist.c_str(), 30, 40);
     s_backgroundSprite.drawString(m_track.c_str(), 30, 65);
-    s_backgroundSprite.drawString(m_track.c_str(), 100, 65);
-
-
+    //s_backgroundSprite.drawString(m_track.c_str(), 100, 65);
 
 
     if (m_volume == 0)
@@ -95,6 +104,7 @@ void ScreenHandler::buffer_image()
 
     //s_backgroundSprite.drawString(String(m_batteryLevel, 2), 90, 10);
     draw_battery(s_backgroundSprite);
+    draw_bluetooth_status(s_backgroundSprite);
 
       // render media control
     if (m_playStatus == paused || m_playStatus == stopped)
@@ -109,7 +119,7 @@ void ScreenHandler::buffer_image()
 void ScreenHandler::t_display_handler(void *arg)
 {
 
-    const TickType_t xDelay = 200 / portTICK_PERIOD_MS;
+    const TickType_t xDelay = 100 / portTICK_PERIOD_MS;
     for (;;)
     {
         instance->buffer_image();
@@ -150,28 +160,79 @@ void ScreenHandler::update_play_status(playStatus a_playStatus)
 }
 
 
-void ScreenHandler::set_battery_level(std::uint32_t a_level){
+void ScreenHandler::set_battery_level(std::uint32_t a_level, bool a_danger){
     if(a_level > 4 || a_level < 0)
         return;
     
+    m_batteryEmpty = a_danger;
     m_batteryLevel = a_level;
 }
 
 void ScreenHandler::draw_battery(TFT_eSprite& a_sprite){
 
+    //general battery outline and pos
     constexpr int bat_height{18};
     constexpr int bat_width{30};
     constexpr int bat_thickness{3};
+    constexpr int xTopLeftPos{200};
+    constexpr int distToTop{10};
+    //the little plus bump on the battery
+    constexpr int plusBumpWidth{4};
+    constexpr int plusBumpHeight{6};
+    constexpr int plusBumpY{distToTop + (bat_height / 2) - (plusBumpHeight / 2)};
+
+    //the contents i.e the battery indicators
+    constexpr int indicatorNrOf{4};
+    constexpr int indicatorEdgeDist{2};
+    constexpr int indicatorXPos{xTopLeftPos + bat_thickness + indicatorEdgeDist};
+    constexpr int indicatorYPos{distToTop + bat_thickness + indicatorEdgeDist};
+    constexpr int indicatorWidth{(bat_width - bat_thickness*2 - indicatorEdgeDist*2 - indicatorEdgeDist*(indicatorNrOf)) / indicatorNrOf};
+    constexpr int indicatorHeight{bat_height - bat_thickness*2 - indicatorEdgeDist*2};
 
 
-    a_sprite.fillRect(200, 10, bat_width, bat_thickness, TFT_WHITE);       // -----
-    a_sprite.fillRect(200, 20, bat_width, bat_thickness, TFT_WHITE);       // -----
+    //battery body
+    a_sprite.fillRect(xTopLeftPos, distToTop, bat_width, bat_height, TFT_WHITE); 
+    a_sprite.fillRect(xTopLeftPos + bat_thickness, distToTop + bat_thickness, (bat_width - bat_thickness*2), (bat_height - bat_thickness*2), TFT_TRANSPARENT); 
 
-    a_sprite.fillRect(200, 10, bat_thickness, bat_height, TFT_WHITE);       // |
-    a_sprite.fillRect(225, 10, bat_thickness, bat_height, TFT_WHITE);       //      |
+    //battery positive bump
+    a_sprite.fillRect(xTopLeftPos + bat_width, plusBumpY, plusBumpWidth, plusBumpHeight, TFT_WHITE); 
 
-    a_sprite.fillRect(225, 16, 6, 5, TFT_WHITE);                            //       *
+    for(int i=0;i<m_batteryLevel;i++){
+        a_sprite.fillRect(indicatorXPos + indicatorWidth*i + indicatorEdgeDist*i, indicatorYPos, indicatorWidth, indicatorHeight, TFT_WHITE); 
+    }
+}
+
+void ScreenHandler::draw_bluetooth_status(TFT_eSprite& a_sprite){
+    int centerX{15};
+    int centerY{110};
+    int centerHalfLength{10};
+    float crossLength{centerHalfLength*0.6F};
+    int width{2};
+    float pi{3.1416};
+
+    static std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+    if(std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count() >= 1000 && connectedStatus == disconnected){
+    
+        centerHalfLength = 14;
+        crossLength = centerHalfLength*0.6;
+        begin = std::chrono::steady_clock::now();
+        width = 3;
+    }
+    
+    a_sprite.drawWideLine(centerX, centerY, centerX + (pi/4 * crossLength), centerY + (pi/4 * crossLength), width,TFT_WHITE, TFT_TRANSPARENT);
+    a_sprite.drawWideLine(centerX, centerY, centerX - (pi/4 * crossLength), centerY - (pi/4 * crossLength), width,TFT_WHITE, TFT_TRANSPARENT);
+    a_sprite.drawWideLine(centerX, centerY, centerX + (pi/4 * crossLength), centerY - (pi/4 * crossLength), width,TFT_WHITE, TFT_TRANSPARENT);
+    a_sprite.drawWideLine(centerX, centerY, centerX - (pi/4 * crossLength), centerY + (pi/4 * crossLength), width,TFT_WHITE, TFT_TRANSPARENT);
+
+
+    a_sprite.drawWideLine(centerX, centerY, centerX, centerY + centerHalfLength, width,TFT_WHITE, TFT_TRANSPARENT);
+    a_sprite.drawWideLine(centerX, centerY, centerX, centerY - centerHalfLength, width,TFT_WHITE, TFT_TRANSPARENT);
+
+    a_sprite.drawWideLine(centerX, centerY - centerHalfLength,  centerX + (pi/4 * crossLength), centerY - (pi/4 * crossLength), width,TFT_WHITE, TFT_TRANSPARENT);
+    a_sprite.drawWideLine(centerX, centerY + centerHalfLength,  centerX + (pi/4 * crossLength), centerY + (pi/4 * crossLength), width,TFT_WHITE, TFT_TRANSPARENT);
+    
 
 
 }
-
